@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop Inventory System</title>
+<style>
+  :root {
+    --bg: #0e1a1f;
+    --panel: #162830;
+    --text: #e8f1f3;
+    --muted: #92aab2;
+    --accent: #2bb3a3;
+    --accent-dark: #1f8a7d;
+    --warn: #e0a82e;
+    --danger: #c9504a;
+    --line: #27424c;
+    --row-hover: #1d3640;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 40px; }
+  header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  header p { margin: 0; color: var(--muted); }
+  .layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; margin-top: 20px; align-items: start; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 1.05rem; }
+  .stack { display: grid; gap: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.selected { background: #1b4a52; outline: 2px solid var(--accent); outline-offset: -2px; }
+  .badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; font-size: .72rem; font-weight: 700; background: var(--warn); color: #1b1b1b; }
+  .badge.out { background: var(--danger); color: #fff; }
+  .empty { color: var(--muted); padding: 14px 4px; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: #0e1a1f; color: var(--text); font-size: 1rem;
+  }
+  input:focus { outline: 2px solid var(--accent); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button.btn {
+    padding: 10px 14px; border: 0; border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer;
+    background: var(--accent); color: #062421;
+  }
+  button.btn.sell { background: var(--accent); }
+  button.btn.restock { background: #5b8def; color: #fff; }
+  button.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  button.btn:disabled { opacity: .45; cursor: not-allowed; }
+  .msg { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: .92rem; background: #1e3640; min-height: 40px; }
+  .msg.ok { background: #17413a; }
+  .msg.err { background: #4a2326; }
+  .msg.warn { background: #4a3d17; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat { background: #0e1a1f; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 1.3rem; }
+  .stat small { color: var(--muted); }
+  .low-list { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: .9rem; }
+  footer { margin-top: 24px; color: var(--muted); font-size: .82rem; text-align: center; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Shop Inventory System</h1>
+    <p>Click an item, then sell or restock it. Items with 5 or fewer units are flagged as low stock.</p>
+  </header>
+
+  <div class="layout">
+    <section class="card" aria-label="Inventory">
+      <h2>Inventory</h2>
+      <input type="text" id="search" placeholder="Search items..." autocomplete="off" aria-label="Search items">
+      <div style="overflow-x:auto; margin-top:10px">
+        <table>
+          <thead>
+            <tr><th>No.</th><th>Item</th><th class="num">Price (GHS)</th><th class="num">Stock</th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyNote" hidden>No matching items.</div>
+    </section>
+
+    <div class="stack">
+      <section class="card" aria-label="Sell or restock">
+        <h2>Sell or restock</h2>
+        <div id="selectedInfo" style="color:var(--muted)">No item selected. Click a row in the table.</div>
+        <label for="qty">Quantity</label>
+        <input type="number" id="qty" min="1" step="1" value="1">
+        <div class="btns">
+          <button class="btn sell" id="sellBtn" disabled>Sell</button>
+          <button class="btn restock" id="restockBtn" disabled>Restock</button>
+        </div>
+        <div class="msg" id="msg" role="status" aria-live="polite">Ready.</div>
+      </section>
+
+      <section class="card" aria-label="Add item">
+        <h2>Add a new item</h2>
+        <label for="newName">Item name</label>
+        <input type="text" id="newName" placeholder="e.g. Bread" autocomplete="off" maxlength="40">
+        <div class="row2">
+          <div>
+            <label for="newPrice">Price (GHS)</label>
+            <input type="number" id="newPrice" min="0" step="0.01" placeholder="4.50">
+          </div>
+          <div>
+            <label for="newQty">Quantity</label>
+            <input type="number" id="newQty" min="0" step="1" placeholder="25">
+          </div>
+        </div>
+        <div class="btns"><button class="btn" id="addBtn">Add item</button></div>
+      </section>
+
+      <section class="card" aria-label="Summary">
+        <h2>Summary</h2>
+        <div class="stats">
+          <div class="stat"><b id="sItems">0</b><small>Different items</small></div>
+          <div class="stat"><b id="sUnits">0</b><small>Units in stock</small></div>
+          <div class="stat"><b id="sValue">GHS 0.00</b><small>Total stock value</small></div>
+          <div class="stat"><b id="sLow">0</b><small>Low-stock items</small></div>
+        </div>
+        <ul class="low-list" id="lowList"></ul>
+        <div class="btns"><button class="btn ghost" id="resetBtn">Reset to sample data</button></div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    Built with parallel arrays: <code>names[]</code>, <code>prices[]</code> and <code>stock[]</code> share one index.
+    Source code on <a href="https://github.com/mysterious141-spec/shop-inventory-system">GitHub</a>.
+  </footer>
+</div>
+
+<script>
+  // ---- Data: three parallel arrays, exactly like the Java version ----
+  const CAPACITY = 20, LOW_STOCK = 5;
+  let names  = Array(CAPACITY).fill(null);
+  let prices = Array(CAPACITY).fill(0);
+  let stock  = Array(CAPACITY).fill(0);
+  let count = 0;          // how many positions are in use
+  let selected = -1;      // index of the selected item, or -1
+
+  const STORE_KEY = "shopInventoryData";
+
+  function addItem(name, price, qty) {
+    names[count] = name;
+    prices[count] = price;
+    stock[count] = qty;
+    count++;
+  }
+
+  function seed() {
+    names  = Array(CAPACITY).fill(null);
+    prices = Array(CAPACITY).fill(0);
+    stock  = Array(CAPACITY).fill(0);
+    count = 0;
+    addItem("Rice (5kg)", 85.00, 20);
+    addItem("Cooking Oil (1L)", 32.50, 12);
+    addItem("Sugar (1kg)", 18.00, 4);
+    addItem("Milk Tin", 6.50, 30);
+  }
+
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ names, prices, stock, count })); } catch (e) { /* storage unavailable */ }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return false;
+      const d = JSON.parse(raw);
+      if (Array.isArray(d.names) && d.names.length === CAPACITY &&
+          Array.isArray(d.prices) && d.prices.length === CAPACITY &&
+          Array.isArray(d.stock) && d.stock.length === CAPACITY &&
+          Number.isInteger(d.count) && d.count >= 0 && d.count <= CAPACITY) {
+        names = d.names; prices = d.prices; stock = d.stock; count = d.count;
+        return true;
+      }
+    } catch (e) { /* ignore bad data */ }
+    return false;
+  }
+
+  // ---- Elements ----
+  const tbody = document.getElementById("tbody");
+  const emptyNote = document.getElementById("emptyNote");
+  const searchEl = document.getElementById("search");
+  const qtyEl = document.getElementById("qty");
+  const sellBtn = document.getElementById("sellBtn");
+  const restockBtn = document.getElementById("restockBtn");
+  const infoEl = document.getElementById("selectedInfo");
+  const msgEl = document.getElementById("msg");
+
+  const money = (n) => n.toFixed(2);
+
+  function say(text, kind) {
+    msgEl.textContent = text;
+    msgEl.className = "msg" + (kind ? " " + kind : "");
+  }
+
+  // indexOf: position of an item by name (ignoring case), or -1
+  function indexOf(name) {
+    for (let i = 0; i < count; i++) {
+      if (names[i].toLowerCase() === name.toLowerCase()) return i;
+    }
+    return -1;
+  }
+
+  // ---- Drawing the table (loop over the arrays) ----
+  function drawTable() {
+    const term = searchEl.value.trim().toLowerCase();
+    tbody.innerHTML = "";
+    let shown = 0;
+    for (let i = 0; i < count; i++) {
+      if (term && !names[i].toLowerCase().includes(term)) continue;
+      shown++;
+      const tr = document.createElement("tr");
+      if (i === selected) tr.classList.add("selected");
+
+      const tdNo = document.createElement("td"); tdNo.textContent = i + 1;
+      const tdName = document.createElement("td"); tdName.textContent = names[i];
+      const tdPrice = document.createElement("td"); tdPrice.className = "num"; tdPrice.textContent = money(prices[i]);
+      const tdStock = document.createElement("td"); tdStock.className = "num"; tdStock.textContent = stock[i];
+
+      if (stock[i] === 0) {
+        const b = document.createElement("span"); b.className = "badge out"; b.textContent = "Out"; tdStock.appendChild(b);
+      } else if (stock[i] <= LOW_STOCK) {
+        const b = document.createElement("span"); b.className = "badge"; b.textContent = "Low"; tdStock.appendChild(b);
+      }
+
+      tr.append(tdNo, tdName, tdPrice, tdStock);
+      tr.addEventListener("click", () => selectItem(i));
+      tbody.appendChild(tr);
+    }
+    emptyNote.hidden = shown !== 0;
+    if (count === 0) { emptyNote.textContent = "No items in inventory."; emptyNote.hidden = false; }
+    else emptyNote.textContent = "No matching items.";
+  }
+
+  function selectItem(i) {
+    selected = i;
+    infoEl.textContent = "Selected: " + names[i] + " (GHS " + money(prices[i]) + ", " + stock[i] + " in stock)";
+    sellBtn.disabled = false;
+    restockBtn.disabled = false;
+    say("Enter a quantity, then press Sell or Restock.");
+    drawTable();
+  }
+
+  function clearSelection() {
+    selected = -1;
+    infoEl.textContent = "No item selected. Click a row in the table.";
+    sellBtn.disabled = true;
+    restockBtn.disabled = true;
+  }
+
+  function readQty(el) {
+    const raw = el.value.trim();
+    if (!/^\d+$/.test(raw)) return null;
+    return parseInt(raw, 10);
+  }
+
+  // ---- Actions ----
+  function sellItem() {
+    if (selected < 0) return say("Select an item first.", "err");
+    const qty = readQty(qtyEl);
+    if (qty === null) return say("Invalid quantity.", "err");
+    if (qty <= 0) return say("Quantity must be at least 1.", "err");
+    if (qty > stock[selected]) return say("Not enough stock. Only " + stock[selected] + " left.", "err");
+    stock[selected] -= qty;
+    const total = qty * prices[selected];
+    let text = "Sold " + qty + " x " + names[selected] + ". Total: GHS " + money(total);
+    let kind = "ok";
+    if (stock[selected] <= LOW_STOCK) {
+      text += ". Warning: " + names[selected] + " is running low (" + stock[selected] + " left).";
+      kind = "warn";
+    }
+    save();
+    say(text, kind);
+    selectItem(selected);
+    refresh();
+    // selectItem resets the message, so show the sale message again
+    say(text, kind);
+  }
+
+  function restockItem() {
+    if (selected < 0) return say("Select an item first.", "err");
+    const qty = readQty(qtyEl);
+    if (qty === null) return say("Invalid quantity.", "err");
+    if (qty <= 0) return say("Quantity must be at least 1.", "err");
+    stock[selected] += qty;
+    save();
+    const text = names[selected] + " now has " + stock[selected] + " in stock.";
+    selectItem(selected);
+    refresh();
+    say(text, "ok");
+  }
+
+  function addNewItem() {
+    const nameEl = document.getElementById("newName");
+    const priceEl = document.getElementById("newPrice");
+    const nqtyEl = document.getElementById("newQty");
+    const name = nameEl.value.trim();
+    if (count === CAPACITY) return say("Inventory is full (" + CAPACITY + " items).", "err");
+    if (!name) return say("Name cannot be empty.", "err");
+    if (indexOf(name) !== -1) return say("That item already exists. Use Restock instead.", "err");
+    const price = parseFloat(priceEl.value);
+    const qty = readQty(nqtyEl);
+    if (isNaN(price) || qty === null) return say("Invalid number. Item not added.", "err");
+    if (price < 0) return say("Price and quantity cannot be negative.", "err");
+    addItem(name, price, qty);
+    save();
+    nameEl.value = ""; priceEl.value = ""; nqtyEl.value = "";
+    say(name + " added.", "ok");
+    refresh();
+  }
+
+  function updateSummary() {
+    let units = 0, total = 0, low = 0;
+    const lowNames = [];
+    for (let i = 0; i < count; i++) {
+      units += stock[i];
+      total += prices[i] * stock[i];
+      if (stock[i] <= LOW_STOCK) { low++; lowNames.push(names[i] + " (" + stock[i] + " left)"); }
+    }
+    document.getElementById("sItems").textContent = count;
+    document.getElementById("sUnits").textContent = units;
+    document.getElementById("sValue").textContent = "GHS " + money(total);
+    document.getElementById("sLow").textContent = low;
+    const ul = document.getElementById("lowList");
+    ul.innerHTML = "";
+    lowNames.forEach((t) => { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+  }
+
+  function resetAll() {
+    seed();
+    save();
+    clearSelection();
+    searchEl.value = "";
+    say("Inventory reset to the sample data.", "ok");
+    refresh();
+  }
+
+  function refresh() {
+    drawTable();
+    updateSummary();
+  }
+
+  sellBtn.addEventListener("click", sellItem);
+  restockBtn.addEventListener("click", restockItem);
+  document.getElementById("addBtn").addEventListener("click", addNewItem);
+  document.getElementById("resetBtn").addEventListener("click", resetAll);
+  searchEl.addEventListener("input", drawTable);
+
+  if (!load()) seed();
+  refresh();
+</script>
+</body>
+</html>
